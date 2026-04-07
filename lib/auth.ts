@@ -8,6 +8,14 @@ const trustedOrigins = (process.env.BETTER_AUTH_TRUSTED_ORIGINS || "")
   .map((origin) => origin.trim())
   .filter(Boolean);
 
+const useSecureCookiesOverride = process.env.BETTER_AUTH_USE_SECURE_COOKIES;
+const useSecureCookies =
+  useSecureCookiesOverride === "true"
+    ? true
+    : useSecureCookiesOverride === "false"
+      ? false
+      : (process.env.BETTER_AUTH_URL?.startsWith("https://") ?? process.env.NODE_ENV === "production");
+
 export const auth = betterAuth({
   appName: "Image Studio",
   baseURL: process.env.BETTER_AUTH_URL,
@@ -18,7 +26,7 @@ export const auth = betterAuth({
     enabled: true,
   },
   advanced: {
-    useSecureCookies: process.env.NODE_ENV === "production",
+    useSecureCookies,
   },
   plugins: [nextCookies()],
 });
