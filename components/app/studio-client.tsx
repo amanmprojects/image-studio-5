@@ -24,7 +24,12 @@ import { FolderIcon, SparklesIcon } from "lucide-react";
 import { useMemo, useState } from "react";
 import type { PromptInputMessage } from "@/components/ai-elements/prompt-input";
 
-type FormStatus = "ready" | "submitted" | "error";
+type PendingGeneration = {
+  id: string;
+  prompt: string;
+  modelFamily: string;
+  aspectRatio: string;
+};
 
 export function StudioClient(props: {
   initialCollections: CollectionRecord[];
@@ -38,63 +43,62 @@ export function StudioClient(props: {
   const [model, setModel] = useState<SupportedModelId>("gemini-2.5-flash-image");
   const [aspectRatio, setAspectRatio] = useState("1:1");
   const [collectionId, setCollectionId] = useState<string>("none");
-  const [status, setStatus] = useState<FormStatus>("ready");
+  const [pendingGenerations, setPendingGenerations] = useState<PendingGeneration[]>([]);
   const [error, setError] = useState<string | null>(null);
-  const [pendingPrompt, setPendingPrompt] = useState<string | null>(null);
 
   const selectedModel = useMemo(
     () => MODEL_DEFINITIONS.find((item) => item.id === model) ?? MODEL_DEFINITIONS[0],
     [model]
   );
 
-  async function handleGenerate(message: PromptInputMessage) {
+  function handleGenerate(message: PromptInputMessage) {
     const prompt = message.text.trim();
     if (!prompt) {
       setError("Please enter a prompt.");
-      setStatus("error");
       return;
     }
 
-    setStatus("submitted");
     setError(null);
-    setPendingPrompt(prompt);
 
-    try {
-      const response = await fetch("/api/images/generate", {
-        method: "POST",
-        headers: {
-          "content-type": "application/json",
-        },
-        body: JSON.stringify({
-          prompt,
-          model,
-          aspectRatio,
-          collectionId: collectionId === "none" ? null : collectionId,
-        }),
-      });
+    const pendingId = crypto.randomUUID();
 
-      const payload = (await response.json()) as {
-        data?: GalleryImage;
-        message?: string;
-      };
+    setPendingGenerations((prev) => [
+      { id: pendingId, prompt, modelFamily: selectedModel.family, aspectRatio },
+      ...prev,
+    ]);
 
-      if (!response.ok || !payload.data) {
-        throw new Error(payload.message || "Failed to generate image.");
+    void (async () => {
+      try {
+        const response = await fetch("/api/images/generate", {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({
+            prompt,
+            model,
+            aspectRatio,
+            collectionId: collectionId === "none" ? null : collectionId,
+          }),
+        });
+
+        const payload = (await response.json()) as {
+          data?: GalleryImage;
+          message?: string;
+        };
+
+        if (!response.ok || !payload.data) {
+          throw new Error(payload.message || "Failed to generate image.");
+        }
+
+        setPendingGenerations((prev) => prev.filter((p) => p.id !== pendingId));
+        setGeneratedImage(payload.data);
+        setRecentImages((current) =>
+          [payload.data!, ...current.filter((item) => item.id !== payload.data!.id)].slice(0, 6)
+        );
+      } catch (err) {
+        setPendingGenerations((prev) => prev.filter((p) => p.id !== pendingId));
+        setError(err instanceof Error ? err.message : "Failed to generate image.");
       }
-
-      setGeneratedImage(payload.data);
-      setRecentImages((current) => [payload.data!, ...current.filter((item) => item.id !== payload.data!.id)].slice(0, 6));
-      setStatus("ready");
-      setPendingPrompt(null);
-    } catch (generationError) {
-      setError(
-        generationError instanceof Error
-          ? generationError.message
-          : "Failed to generate image."
-      );
-      setStatus("error");
-      setPendingPrompt(null);
-    }
+    })();
   }
 
   return (
@@ -181,22 +185,13 @@ export function StudioClient(props: {
                   {collectionId !== "none" ? (
                     <Badge variant="outline">
                       <FolderIcon className="size-3.5" />
-                      {
-                        collections.find((collection) => collection.id === collectionId)
-                          ?.name
-                      }
+                      {collections.find((c) => c.id === collectionId)?.name}
                     </Badge>
                   ) : null}
                 </PromptInputTools>
-                <PromptInputSubmit status={status} size="sm" className="gap-1.5">
-                  {status === "submitted" ? (
-                    <Spinner className="size-3.5" />
-                  ) : (
-                    <>
-                      <SparklesIcon className="size-3.5" />
-                      Generate
-                    </>
-                  )}
+                <PromptInputSubmit size="sm" className="gap-1.5">
+                  <SparklesIcon className="size-3.5" />
+                  Generate
                 </PromptInputSubmit>
               </PromptInputFooter>
             </PromptInput>
@@ -216,16 +211,16 @@ export function StudioClient(props: {
             </CardDescription>
           </CardHeader>
           <CardContent>
-            {recentImages.length === 0 && !pendingPrompt ? (
+            {recentImages.length === 0 && pendingGenerations.length === 0 ? (
               <div className="rounded-xl border border-dashed px-4 py-10 text-center text-sm text-muted-foreground">
                 No images yet. Generate your first image above.
               </div>
             ) : (
               <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
-                {pendingPrompt ? (
-                  <div className="overflow-hidden rounded-xl border bg-card">
+                {pendingGenerations.map((pending) => (
+                  <div key={pending.id} className="overflow-hidden rounded-xl border bg-card">
                     <div className="aspect-square overflow-hidden bg-muted">
-                      <div className="flex h-full w-full animate-pulse items-center justify-center bg-muted">
+                      <div className="flex h-full w-full animate-pulse items-center justify-center">
                         <div className="flex flex-col items-center gap-2 text-muted-foreground">
                           <Spinner className="size-6" />
                           <span className="text-xs">Generating…</span>
@@ -233,14 +228,16 @@ export function StudioClient(props: {
                       </div>
                     </div>
                     <div className="space-y-2 p-3">
-                      <p className="line-clamp-2 text-sm font-medium text-muted-foreground">{pendingPrompt}</p>
+                      <p className="line-clamp-2 text-sm font-medium text-muted-foreground">
+                        {pending.prompt}
+                      </p>
                       <div className="flex flex-wrap gap-2 text-xs text-muted-foreground">
-                        <span>{selectedModel.family}</span>
-                        <span>{aspectRatio}</span>
+                        <span>{pending.modelFamily}</span>
+                        <span>{pending.aspectRatio}</span>
                       </div>
                     </div>
                   </div>
-                ) : null}
+                ))}
                 {recentImages.map((image) => (
                   <a
                     className="group overflow-hidden rounded-xl border bg-card"
@@ -281,14 +278,7 @@ export function StudioClient(props: {
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
-            {status === "submitted" ? (
-              <div className="flex aspect-square items-center justify-center rounded-xl border bg-muted">
-                <div className="flex flex-col items-center gap-3 text-muted-foreground">
-                  <Spinner className="size-8" />
-                  <span className="text-sm">Generating image…</span>
-                </div>
-              </div>
-            ) : generatedImage ? (
+            {generatedImage ? (
               <>
                 <div className="overflow-hidden rounded-xl border bg-muted">
                   <img
