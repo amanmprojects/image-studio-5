@@ -316,20 +316,6 @@ export function StudioClient(props: {
             )}
           </CardContent>
         </Card>
-
-        <Card className="overflow-hidden">
-          <CardContent className="p-0">
-            <div className="overflow-hidden rounded-xl border bg-muted">
-              <Image
-                alt="Studio preview"
-                className="h-auto w-full"
-                height={600}
-                src="/window.svg"
-                width={800}
-              />
-            </div>
-          </CardContent>
-        </Card>
       </div>
     </div>
   );
