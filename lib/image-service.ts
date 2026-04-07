@@ -20,7 +20,7 @@ import {
   MODEL_DEFINITIONS,
   type SupportedModelId,
 } from "@/lib/model-options";
-import { getObjectUrl, uploadGeneratedImage } from "@/lib/s3";
+import { uploadGeneratedImage } from "@/lib/s3";
 import "server-only";
 
 type AspectRatio = `${number}:${number}`;
@@ -59,10 +59,10 @@ function extensionFromMediaType(mediaType: string) {
   }
 }
 
-async function resolveImageUrl(record: ImageAssetRecord): Promise<GalleryImage> {
+function resolveImageUrl(record: ImageAssetRecord): GalleryImage {
   return {
     ...record,
-    url: await getObjectUrl(record.s3Key),
+    url: `/api/images/${record.id}/content`,
   };
 }
 
@@ -130,7 +130,7 @@ export async function generateAndStoreImage(input: {
 export async function getUserGallery(userId: string) {
   await bootstrapApp();
   const records = listImageAssets(userId);
-  return Promise.all(records.map(resolveImageUrl));
+  return records.map(resolveImageUrl);
 }
 
 export async function getUserCollections(userId: string) {

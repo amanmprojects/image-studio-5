@@ -19,6 +19,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import type { CollectionRecord, GalleryImage } from "@/lib/app-types";
 import { MODEL_DEFINITIONS, type SupportedModelId } from "@/lib/model-options";
+import { Spinner } from "@/components/ui/spinner";
 import { FolderIcon, SparklesIcon } from "lucide-react";
 import { useMemo, useState } from "react";
 import type { PromptInputMessage } from "@/components/ai-elements/prompt-input";
@@ -39,6 +40,7 @@ export function StudioClient(props: {
   const [collectionId, setCollectionId] = useState<string>("none");
   const [status, setStatus] = useState<FormStatus>("ready");
   const [error, setError] = useState<string | null>(null);
+  const [pendingPrompt, setPendingPrompt] = useState<string | null>(null);
 
   const selectedModel = useMemo(
     () => MODEL_DEFINITIONS.find((item) => item.id === model) ?? MODEL_DEFINITIONS[0],
@@ -55,6 +57,7 @@ export function StudioClient(props: {
 
     setStatus("submitted");
     setError(null);
+    setPendingPrompt(prompt);
 
     try {
       const response = await fetch("/api/images/generate", {
@@ -82,6 +85,7 @@ export function StudioClient(props: {
       setGeneratedImage(payload.data);
       setRecentImages((current) => [payload.data!, ...current.filter((item) => item.id !== payload.data!.id)].slice(0, 6));
       setStatus("ready");
+      setPendingPrompt(null);
     } catch (generationError) {
       setError(
         generationError instanceof Error
@@ -89,6 +93,7 @@ export function StudioClient(props: {
           : "Failed to generate image."
       );
       setStatus("error");
+      setPendingPrompt(null);
     }
   }
 
@@ -183,7 +188,16 @@ export function StudioClient(props: {
                     </Badge>
                   ) : null}
                 </PromptInputTools>
-                <PromptInputSubmit status={status}>Generate</PromptInputSubmit>
+                <PromptInputSubmit status={status} size="sm" className="gap-1.5">
+                  {status === "submitted" ? (
+                    <Spinner className="size-3.5" />
+                  ) : (
+                    <>
+                      <SparklesIcon className="size-3.5" />
+                      Generate
+                    </>
+                  )}
+                </PromptInputSubmit>
               </PromptInputFooter>
             </PromptInput>
             {error ? (
@@ -202,12 +216,31 @@ export function StudioClient(props: {
             </CardDescription>
           </CardHeader>
           <CardContent>
-            {recentImages.length === 0 ? (
+            {recentImages.length === 0 && !pendingPrompt ? (
               <div className="rounded-xl border border-dashed px-4 py-10 text-center text-sm text-muted-foreground">
                 No images yet. Generate your first image above.
               </div>
             ) : (
               <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+                {pendingPrompt ? (
+                  <div className="overflow-hidden rounded-xl border bg-card">
+                    <div className="aspect-square overflow-hidden bg-muted">
+                      <div className="flex h-full w-full animate-pulse items-center justify-center bg-muted">
+                        <div className="flex flex-col items-center gap-2 text-muted-foreground">
+                          <Spinner className="size-6" />
+                          <span className="text-xs">Generating…</span>
+                        </div>
+                      </div>
+                    </div>
+                    <div className="space-y-2 p-3">
+                      <p className="line-clamp-2 text-sm font-medium text-muted-foreground">{pendingPrompt}</p>
+                      <div className="flex flex-wrap gap-2 text-xs text-muted-foreground">
+                        <span>{selectedModel.family}</span>
+                        <span>{aspectRatio}</span>
+                      </div>
+                    </div>
+                  </div>
+                ) : null}
                 {recentImages.map((image) => (
                   <a
                     className="group overflow-hidden rounded-xl border bg-card"
@@ -248,7 +281,14 @@ export function StudioClient(props: {
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
-            {generatedImage ? (
+            {status === "submitted" ? (
+              <div className="flex aspect-square items-center justify-center rounded-xl border bg-muted">
+                <div className="flex flex-col items-center gap-3 text-muted-foreground">
+                  <Spinner className="size-8" />
+                  <span className="text-sm">Generating image…</span>
+                </div>
+              </div>
+            ) : generatedImage ? (
               <>
                 <div className="overflow-hidden rounded-xl border bg-muted">
                   <img
