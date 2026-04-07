@@ -19,17 +19,11 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import type { CollectionRecord, GalleryImage } from "@/lib/app-types";
 import { MODEL_DEFINITIONS, type SupportedModelId } from "@/lib/model-options";
+import { usePendingGenerations } from "@/components/app/pending-generations-context";
 import { Spinner } from "@/components/ui/spinner";
 import { FolderIcon, SparklesIcon } from "lucide-react";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import type { PromptInputMessage } from "@/components/ai-elements/prompt-input";
-
-type PendingGeneration = {
-  id: string;
-  prompt: string;
-  modelFamily: string;
-  aspectRatio: string;
-};
 
 export function StudioClient(props: {
   initialCollections: CollectionRecord[];
@@ -43,8 +37,18 @@ export function StudioClient(props: {
   const [model, setModel] = useState<SupportedModelId>("gemini-2.5-flash-image");
   const [aspectRatio, setAspectRatio] = useState("1:1");
   const [collectionId, setCollectionId] = useState<string>("none");
-  const [pendingGenerations, setPendingGenerations] = useState<PendingGeneration[]>([]);
+  const { pendingGenerations, addPending, removePending, registerCompletionHandler, notifyCompletion } =
+    usePendingGenerations();
   const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    registerCompletionHandler((image) => {
+      setGeneratedImage(image);
+      setRecentImages((current) =>
+        [image, ...current.filter((item) => item.id !== image.id)].slice(0, 6)
+      );
+    });
+  }, [registerCompletionHandler]);
 
   const selectedModel = useMemo(
     () => MODEL_DEFINITIONS.find((item) => item.id === model) ?? MODEL_DEFINITIONS[0],
@@ -62,10 +66,7 @@ export function StudioClient(props: {
 
     const pendingId = crypto.randomUUID();
 
-    setPendingGenerations((prev) => [
-      { id: pendingId, prompt, modelFamily: selectedModel.family, aspectRatio },
-      ...prev,
-    ]);
+    addPending({ id: pendingId, prompt, modelFamily: selectedModel.family, aspectRatio });
 
     void (async () => {
       try {
@@ -89,13 +90,10 @@ export function StudioClient(props: {
           throw new Error(payload.message || "Failed to generate image.");
         }
 
-        setPendingGenerations((prev) => prev.filter((p) => p.id !== pendingId));
-        setGeneratedImage(payload.data);
-        setRecentImages((current) =>
-          [payload.data!, ...current.filter((item) => item.id !== payload.data!.id)].slice(0, 6)
-        );
+        removePending(pendingId);
+        notifyCompletion(payload.data);
       } catch (err) {
-        setPendingGenerations((prev) => prev.filter((p) => p.id !== pendingId));
+        removePending(pendingId);
         setError(err instanceof Error ? err.message : "Failed to generate image.");
       }
     })();

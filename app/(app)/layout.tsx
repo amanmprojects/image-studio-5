@@ -1,4 +1,5 @@
 import { AppShell } from "@/components/app/app-shell";
+import { PendingGenerationsProvider } from "@/components/app/pending-generations-context";
 import { requireSession } from "@/lib/session";
 import type { PropsWithChildren } from "react";
 
@@ -14,7 +15,7 @@ export default async function ProtectedLayout({ children }: PropsWithChildren) {
         name: session.user.name,
       }}
     >
-      {children}
+      <PendingGenerationsProvider>{children}</PendingGenerationsProvider>
     </AppShell>
   );
 }
