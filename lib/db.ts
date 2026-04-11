@@ -256,3 +256,12 @@ export function collectionExistsForUser(collectionId: string, userId: string) {
 
   return Boolean(statement.get(collectionId, userId));
 }
+
+export function isSqliteUniqueConstraintError(error: unknown): boolean {
+  return (
+    typeof error === "object" &&
+    error !== null &&
+    "code" in error &&
+    (error as { code: unknown }).code === "SQLITE_CONSTRAINT_UNIQUE"
+  );
+}

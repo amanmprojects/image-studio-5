@@ -8,6 +8,7 @@ import {
   createCollection,
   createImageAsset,
   getImageAssetById,
+  isSqliteUniqueConstraintError,
   listCollections,
   listImageAssets,
   setImageAssetCollection,
@@ -20,7 +21,7 @@ import {
   MODEL_DEFINITIONS,
   type SupportedModelId,
 } from "@/lib/model-options";
-import { uploadGeneratedImage } from "@/lib/s3";
+import { deleteGeneratedImage, uploadGeneratedImage } from "@/lib/s3";
 import "server-only";
 
 type AspectRatio = `${number}:${number}`;
@@ -45,6 +46,13 @@ export const moveImageToCollectionInputSchema = z.object({
 });
 
 export type GalleryCollection = CollectionRecord;
+
+export class DuplicateCollectionNameError extends Error {
+  constructor() {
+    super("A collection with this name already exists.");
+    this.name = "DuplicateCollectionNameError";
+  }
+}
 
 function extensionFromMediaType(mediaType: string) {
   switch (mediaType) {
@@ -106,25 +114,34 @@ export async function generateAndStoreImage(input: {
     contentType: image.mediaType,
   });
 
-  const record = createImageAsset({
-    id,
-    userId: input.userId,
-    prompt: input.prompt,
-    model: input.model,
-    provider: modelDefinition.provider,
-    aspectRatio: input.aspectRatio,
-    sourceType: "text_to_image",
-    s3Key,
-    mediaType: image.mediaType,
-    collectionId: input.collectionId ?? null,
-    createdAt,
-  });
+  try {
+    const record = createImageAsset({
+      id,
+      userId: input.userId,
+      prompt: input.prompt,
+      model: input.model,
+      provider: modelDefinition.provider,
+      aspectRatio: input.aspectRatio,
+      sourceType: "text_to_image",
+      s3Key,
+      mediaType: image.mediaType,
+      collectionId: input.collectionId ?? null,
+      createdAt,
+    });
 
-  if (!record) {
-    throw new Error("Failed to persist generated image.");
+    if (!record) {
+      throw new Error("Failed to persist generated image.");
+    }
+
+    return resolveImageUrl(record);
+  } catch (error) {
+    try {
+      await deleteGeneratedImage(s3Key);
+    } catch {
+      // Best-effort cleanup; original error is more important.
+    }
+    throw error;
   }
-
-  return resolveImageUrl(record);
 }
 
 export async function getUserGallery(userId: string) {
@@ -141,18 +158,25 @@ export async function getUserCollections(userId: string) {
 export async function createUserCollection(userId: string, name: string) {
   await bootstrapApp();
 
-  const collection = createCollection({
-    id: nanoid(),
-    userId,
-    name,
-    createdAt: new Date().toISOString(),
-  });
+  try {
+    const collection = createCollection({
+      id: nanoid(),
+      userId,
+      name,
+      createdAt: new Date().toISOString(),
+    });
 
-  if (!collection) {
-    throw new Error("Failed to create collection.");
+    if (!collection) {
+      throw new Error("Failed to create collection.");
+    }
+
+    return collection;
+  } catch (error) {
+    if (isSqliteUniqueConstraintError(error)) {
+      throw new DuplicateCollectionNameError();
+    }
+    throw error;
   }
-
-  return collection;
 }
 
 export async function moveUserImageToCollection(input: {

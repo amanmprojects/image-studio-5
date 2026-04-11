@@ -1,6 +1,5 @@
 "use client";
 
-import Image from "next/image";
 import { ModelPicker } from "@/components/app/model-picker";
 import {
   PromptInput,

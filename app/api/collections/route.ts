@@ -1,6 +1,7 @@
 import {
   createCollectionInputSchema,
   createUserCollection,
+  DuplicateCollectionNameError,
   getUserCollections,
 } from "@/lib/image-service";
 import { getSessionFromHeaders } from "@/lib/session";
@@ -42,6 +43,9 @@ export async function POST(request: Request) {
     const collection = await createUserCollection(session.user.id, parsed.data.name);
     return NextResponse.json({ data: collection });
   } catch (error) {
+    if (error instanceof DuplicateCollectionNameError) {
+      return NextResponse.json({ message: error.message }, { status: 409 });
+    }
     return NextResponse.json(
       {
         message:
