@@ -14,7 +14,11 @@ const geistMono = Geist_Mono({
 
 export const metadata: Metadata = {
   title: "Image Studio",
-  description: "Gemini-first image generation studio with Better Auth, SQLite, and S3.",
+  description:
+    "Gemini-first image generation studio with Better Auth, Aurora DSQL, and cloud storage.",
+  icons: {
+    icon: "/icon.jpg",
+  },
 };
 
 export default function RootLayout({

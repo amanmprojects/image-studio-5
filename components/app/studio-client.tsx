@@ -106,8 +106,8 @@ export function StudioClient(props: {
           <CardHeader>
             <CardTitle>Generate with a simple endpoint</CardTitle>
             <CardDescription>
-              Prompt, pick a Google image model, choose an aspect ratio, and save
-              the result straight to S3.
+              Prompt, pick a Google image model, choose an aspect ratio, and generate
+              stunning images.
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
@@ -313,23 +313,6 @@ export function StudioClient(props: {
                 Generate an image to see it here.
               </div>
             )}
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader>
-            <CardTitle>Why this is simple</CardTitle>
-            <CardDescription>
-              This studio uses a standard form and one generation endpoint instead
-              of a chat transport.
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-3 text-sm text-muted-foreground">
-            <p>1. Submit prompt + model + aspect ratio</p>
-            <p>2. Generate one image on the server</p>
-            <p>3. Upload to S3</p>
-            <p>4. Save metadata to SQLite</p>
-            <p>5. Return the created image record</p>
           </CardContent>
         </Card>
       </div>

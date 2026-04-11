@@ -8,6 +8,7 @@ import {
   createCollection,
   createImageAsset,
   getImageAssetById,
+  isPostgresUniqueConstraintError,
   listCollections,
   listImageAssets,
   setImageAssetCollection,
@@ -20,7 +21,7 @@ import {
   MODEL_DEFINITIONS,
   type SupportedModelId,
 } from "@/lib/model-options";
-import { uploadGeneratedImage } from "@/lib/s3";
+import { deleteGeneratedImage, uploadGeneratedImage } from "@/lib/s3";
 import "server-only";
 
 type AspectRatio = `${number}:${number}`;
@@ -45,6 +46,13 @@ export const moveImageToCollectionInputSchema = z.object({
 });
 
 export type GalleryCollection = CollectionRecord;
+
+export class DuplicateCollectionNameError extends Error {
+  constructor() {
+    super("A collection with this name already exists.");
+    this.name = "DuplicateCollectionNameError";
+  }
+}
 
 function extensionFromMediaType(mediaType: string) {
   switch (mediaType) {
@@ -84,7 +92,10 @@ export async function generateAndStoreImage(input: {
     throw new Error("Unsupported aspect ratio for the selected model.");
   }
 
-  if (input.collectionId && !collectionExistsForUser(input.collectionId, input.userId)) {
+  if (
+    input.collectionId &&
+    !(await collectionExistsForUser(input.collectionId, input.userId))
+  ) {
     throw new Error("Collection not found.");
   }
 
@@ -106,53 +117,69 @@ export async function generateAndStoreImage(input: {
     contentType: image.mediaType,
   });
 
-  const record = createImageAsset({
-    id,
-    userId: input.userId,
-    prompt: input.prompt,
-    model: input.model,
-    provider: modelDefinition.provider,
-    aspectRatio: input.aspectRatio,
-    sourceType: "text_to_image",
-    s3Key,
-    mediaType: image.mediaType,
-    collectionId: input.collectionId ?? null,
-    createdAt,
-  });
+  try {
+    const record = await createImageAsset({
+      id,
+      userId: input.userId,
+      prompt: input.prompt,
+      model: input.model,
+      provider: modelDefinition.provider,
+      aspectRatio: input.aspectRatio,
+      sourceType: "text_to_image",
+      s3Key,
+      mediaType: image.mediaType,
+      collectionId: input.collectionId ?? null,
+      createdAt,
+    });
 
-  if (!record) {
-    throw new Error("Failed to persist generated image.");
+    if (!record) {
+      throw new Error("Failed to persist generated image.");
+    }
+
+    return resolveImageUrl(record);
+  } catch (error) {
+    try {
+      await deleteGeneratedImage(s3Key);
+    } catch {
+      // Best-effort cleanup; original error is more important.
+    }
+    throw error;
   }
-
-  return resolveImageUrl(record);
 }
 
 export async function getUserGallery(userId: string) {
   await bootstrapApp();
-  const records = listImageAssets(userId);
+  const records = await listImageAssets(userId);
   return records.map(resolveImageUrl);
 }
 
 export async function getUserCollections(userId: string) {
   await bootstrapApp();
-  return listCollections(userId);
+  return await listCollections(userId);
 }
 
 export async function createUserCollection(userId: string, name: string) {
   await bootstrapApp();
 
-  const collection = createCollection({
-    id: nanoid(),
-    userId,
-    name,
-    createdAt: new Date().toISOString(),
-  });
+  try {
+    const collection = await createCollection({
+      id: nanoid(),
+      userId,
+      name,
+      createdAt: new Date().toISOString(),
+    });
 
-  if (!collection) {
-    throw new Error("Failed to create collection.");
+    if (!collection) {
+      throw new Error("Failed to create collection.");
+    }
+
+    return collection;
+  } catch (error) {
+    if (isPostgresUniqueConstraintError(error)) {
+      throw new DuplicateCollectionNameError();
+    }
+    throw error;
   }
-
-  return collection;
 }
 
 export async function moveUserImageToCollection(input: {
@@ -162,16 +189,19 @@ export async function moveUserImageToCollection(input: {
 }) {
   await bootstrapApp();
 
-  if (input.collectionId && !collectionExistsForUser(input.collectionId, input.userId)) {
+  if (
+    input.collectionId &&
+    !(await collectionExistsForUser(input.collectionId, input.userId))
+  ) {
     throw new Error("Collection not found.");
   }
 
-  const existingRecord = getImageAssetById(input.imageId, input.userId);
+  const existingRecord = await getImageAssetById(input.imageId, input.userId);
   if (!existingRecord) {
     throw new Error("Image not found.");
   }
 
-  const updatedRecord = setImageAssetCollection(input);
+  const updatedRecord = await setImageAssetCollection(input);
   if (!updatedRecord) {
     throw new Error("Failed to move image.");
   }

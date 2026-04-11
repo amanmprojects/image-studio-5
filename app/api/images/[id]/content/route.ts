@@ -1,6 +1,6 @@
 import { GetObjectCommand } from "@aws-sdk/client-s3";
 import { getImageAssetById } from "@/lib/db";
-import { s3 } from "@/lib/s3";
+import { getS3BucketName, getS3Client } from "@/lib/s3";
 import { getSessionFromHeaders } from "@/lib/session";
 import { NextResponse } from "next/server";
 
@@ -17,19 +17,28 @@ export async function GET(
   }
 
   const { id } = await params;
-  const record = getImageAssetById(id, session.user.id);
+  const record = await getImageAssetById(id, session.user.id);
 
   if (!record) {
     return NextResponse.json({ message: "Not found" }, { status: 404 });
   }
 
-  const bucket = process.env.AWS_S3_BUCKET;
-  if (!bucket) {
-    return NextResponse.json({ message: "Storage not configured" }, { status: 500 });
+  let s3Response;
+  try {
+    const command = new GetObjectCommand({
+      Bucket: getS3BucketName(),
+      Key: record.s3Key,
+    });
+    s3Response = await getS3Client().send(command);
+  } catch (error) {
+    if (error instanceof Error && error.message === "AWS S3 is not configured.") {
+      return NextResponse.json({ message: "Storage not configured" }, { status: 500 });
+    }
+    return NextResponse.json(
+      { message: "Failed to load image from storage." },
+      { status: 502 }
+    );
   }
-
-  const command = new GetObjectCommand({ Bucket: bucket, Key: record.s3Key });
-  const s3Response = await s3.send(command);
 
   if (!s3Response.Body) {
     return NextResponse.json({ message: "Image not found in storage" }, { status: 404 });
