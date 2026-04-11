@@ -17,7 +17,7 @@ export async function GET(
   }
 
   const { id } = await params;
-  const record = getImageAssetById(id, session.user.id);
+  const record = await getImageAssetById(id, session.user.id);
 
   if (!record) {
     return NextResponse.json({ message: "Not found" }, { status: 404 });

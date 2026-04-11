@@ -25,7 +25,7 @@ export default async function Home() {
               </h1>
               <p className="max-w-2xl text-base leading-7 text-muted-foreground sm:text-lg">
                 Prompt a Google image model, generate stunning images,
-                store metadata in SQLite, and organize everything into collections.
+                store metadata in Aurora DSQL, and organize everything into collections.
               </p>
             </div>
             <div className="flex flex-col items-center gap-3 sm:flex-row sm:justify-center">

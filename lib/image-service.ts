@@ -8,7 +8,7 @@ import {
   createCollection,
   createImageAsset,
   getImageAssetById,
-  isSqliteUniqueConstraintError,
+  isPostgresUniqueConstraintError,
   listCollections,
   listImageAssets,
   setImageAssetCollection,
@@ -92,7 +92,10 @@ export async function generateAndStoreImage(input: {
     throw new Error("Unsupported aspect ratio for the selected model.");
   }
 
-  if (input.collectionId && !collectionExistsForUser(input.collectionId, input.userId)) {
+  if (
+    input.collectionId &&
+    !(await collectionExistsForUser(input.collectionId, input.userId))
+  ) {
     throw new Error("Collection not found.");
   }
 
@@ -115,7 +118,7 @@ export async function generateAndStoreImage(input: {
   });
 
   try {
-    const record = createImageAsset({
+    const record = await createImageAsset({
       id,
       userId: input.userId,
       prompt: input.prompt,
@@ -146,20 +149,20 @@ export async function generateAndStoreImage(input: {
 
 export async function getUserGallery(userId: string) {
   await bootstrapApp();
-  const records = listImageAssets(userId);
+  const records = await listImageAssets(userId);
   return records.map(resolveImageUrl);
 }
 
 export async function getUserCollections(userId: string) {
   await bootstrapApp();
-  return listCollections(userId);
+  return await listCollections(userId);
 }
 
 export async function createUserCollection(userId: string, name: string) {
   await bootstrapApp();
 
   try {
-    const collection = createCollection({
+    const collection = await createCollection({
       id: nanoid(),
       userId,
       name,
@@ -172,7 +175,7 @@ export async function createUserCollection(userId: string, name: string) {
 
     return collection;
   } catch (error) {
-    if (isSqliteUniqueConstraintError(error)) {
+    if (isPostgresUniqueConstraintError(error)) {
       throw new DuplicateCollectionNameError();
     }
     throw error;
@@ -186,16 +189,19 @@ export async function moveUserImageToCollection(input: {
 }) {
   await bootstrapApp();
 
-  if (input.collectionId && !collectionExistsForUser(input.collectionId, input.userId)) {
+  if (
+    input.collectionId &&
+    !(await collectionExistsForUser(input.collectionId, input.userId))
+  ) {
     throw new Error("Collection not found.");
   }
 
-  const existingRecord = getImageAssetById(input.imageId, input.userId);
+  const existingRecord = await getImageAssetById(input.imageId, input.userId);
   if (!existingRecord) {
     throw new Error("Image not found.");
   }
 
-  const updatedRecord = setImageAssetCollection(input);
+  const updatedRecord = await setImageAssetCollection(input);
   if (!updatedRecord) {
     throw new Error("Failed to move image.");
   }

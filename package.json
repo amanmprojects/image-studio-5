@@ -6,13 +6,21 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "db:generate": "drizzle-kit generate",
+    "db:migrate": "drizzle-kit migrate"
+  },
+  "engines": {
+    "node": ">=20"
   },
   "dependencies": {
     "@ai-sdk/google": "^3.0.59",
     "@ai-sdk/react": "^3.0.151",
     "@aws-sdk/client-s3": "^3.1025.0",
+    "@aws-sdk/credential-providers": "^3.1029.0",
+    "@aws-sdk/dsql-signer": "^3.1029.0",
     "@aws-sdk/s3-request-presigner": "^3.1025.0",
+    "@aws/aurora-dsql-node-postgres-connector": "^0.1.8",
     "@radix-ui/react-use-controllable-state": "^1.2.2",
     "@rive-app/react-webgl2": "^4.27.3",
     "@streamdown/cjk": "^1.0.3",
@@ -23,16 +31,17 @@
     "ai": "^6.0.149",
     "ansi-to-react": "^6.2.6",
     "better-auth": "^1.6.0",
-    "better-sqlite3": "^12.8.0",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "cmdk": "^1.1.1",
+    "drizzle-orm": "^0.45.2",
     "embla-carousel-react": "^8.6.0",
     "lucide-react": "^1.7.0",
     "media-chrome": "^4.18.3",
     "motion": "^12.38.0",
     "nanoid": "^5.1.7",
     "next": "16.2.2",
+    "pg": "^8.20.0",
     "radix-ui": "^1.4.3",
     "react": "19.2.4",
     "react-dom": "19.2.4",
@@ -48,10 +57,11 @@
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4",
-    "@types/better-sqlite3": "^7.6.13",
     "@types/node": "^20",
+    "@types/pg": "^8.20.0",
     "@types/react": "^19",
     "@types/react-dom": "^19",
+    "drizzle-kit": "^0.31.10",
     "eslint": "^9",
     "eslint-config-next": "16.2.2",
     "tailwindcss": "^4",
@@ -61,9 +71,5 @@
     "sharp",
     "unrs-resolver"
   ],
-  "trustedDependencies": [
-    "better-sqlite3",
-    "sharp",
-    "unrs-resolver"
-  ]
+  "trustedDependencies": ["sharp", "unrs-resolver"]
 }
