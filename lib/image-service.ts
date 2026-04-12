@@ -2,7 +2,6 @@ import { generateImage } from "ai";
 import { nanoid } from "nanoid";
 import { z } from "zod";
 import type { CollectionRecord, GalleryImage, ImageAssetRecord } from "@/lib/app-types";
-import { bootstrapApp } from "@/lib/bootstrap";
 import {
   collectionExistsForUser,
   createCollection,
@@ -81,8 +80,6 @@ export async function generateAndStoreImage(input: {
   aspectRatio: AspectRatio;
   collectionId?: string | null;
 }) {
-  await bootstrapApp();
-
   const modelDefinition = getModelDefinition(input.model);
   if (!modelDefinition) {
     throw new Error("Unsupported model selected.");
@@ -148,19 +145,15 @@ export async function generateAndStoreImage(input: {
 }
 
 export async function getUserGallery(userId: string) {
-  await bootstrapApp();
   const records = await listImageAssets(userId);
   return records.map(resolveImageUrl);
 }
 
 export async function getUserCollections(userId: string) {
-  await bootstrapApp();
   return await listCollections(userId);
 }
 
 export async function createUserCollection(userId: string, name: string) {
-  await bootstrapApp();
-
   try {
     const collection = await createCollection({
       id: nanoid(),
@@ -187,8 +180,6 @@ export async function moveUserImageToCollection(input: {
   userId: string;
   collectionId: string | null;
 }) {
-  await bootstrapApp();
-
   if (
     input.collectionId &&
     !(await collectionExistsForUser(input.collectionId, input.userId))

@@ -2,21 +2,7 @@ import type { CollectionRecord, ImageAssetRecord } from "@/lib/app-types";
 import { db } from "@/lib/db/drizzle";
 import { collections, imageAssets } from "@/lib/db/schema";
 import { and, desc, eq, sql } from "drizzle-orm";
-import { migrate } from "drizzle-orm/node-postgres/migrator";
-import { join } from "node:path";
 import "server-only";
-
-let appMigrationsPromise: Promise<void> | null = null;
-
-export function runAppMigrations() {
-  if (!appMigrationsPromise) {
-    appMigrationsPromise = migrate(db, {
-      migrationsFolder: join(process.cwd(), "drizzle"),
-    });
-  }
-
-  return appMigrationsPromise;
-}
 
 function mapCollection(row: typeof collections.$inferSelect): CollectionRecord {
   return {

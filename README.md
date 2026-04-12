@@ -47,7 +47,9 @@ You can start editing the page by modifying `app/page.tsx`. The page auto-update
 
 ## Database migrations
 
-App tables are managed with [Drizzle](https://orm.drizzle.team/). SQL migrations live under `drizzle/`. At runtime, `bootstrapApp()` applies Better Auth migrations and then Drizzle migrations. To generate a new migration after editing `lib/db/schema.ts`:
+[Amazon Aurora DSQL](https://docs.aws.amazon.com/aurora-dsql/latest/userguide/what-is-aurora-dsql.html) does **not** support `FOREIGN KEY` constraints. Better Auth therefore uses the [Drizzle adapter](https://www.better-auth.com/docs/adapters/drizzle) with hand-authored tables in [`lib/db/auth-schema.ts`](lib/db/auth-schema.ts) (no FKs). App tables live in [`lib/db/schema.ts`](lib/db/schema.ts). SQL migrations are under `drizzle/`; at runtime `bootstrapApp()` runs **only** Drizzle’s migrator (not Better Auth’s built-in `runMigrations()`, which emits unsupported FK DDL).
+
+After editing schemas, generate a migration:
 
 ```bash
 bun run db:generate

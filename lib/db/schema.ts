@@ -1,4 +1,3 @@
-import { desc } from "drizzle-orm";
 import {
   index,
   pgTable,
@@ -32,13 +31,12 @@ export const imageAssets = pgTable(
     sourceType: text("source_type").notNull(),
     s3Key: text("s3_key").notNull(),
     mediaType: text("media_type").notNull(),
-    collectionId: text("collection_id").references(() => collections.id, {
-      onDelete: "set null",
-    }),
+    // No FK: Aurora DSQL does not support FOREIGN KEY constraints.
+    collectionId: text("collection_id"),
     createdAt: text("created_at").notNull(),
   },
   (t) => [
-    index("idx_image_assets_user_id").on(t.userId, desc(t.createdAt)),
+    index("idx_image_assets_user_id").on(t.userId, t.createdAt),
     index("idx_image_assets_collection_id").on(t.collectionId),
   ]
 );
